@@ -40,10 +40,30 @@ uv pip install -r requirements.txt
      - SPOTIFY_CLIENT_ID=your_client_id
      - SPOTIFY_CLIENT_SECRET=your_client_secret
 
-## Usage
+## CLI Usage
 
-Run the main script:
+The project provides a command-line interface with the following commands:
+
+### Find Path Between Artists
 
 ```bash
-python main.py
+python cli.py path
 ```
+
+This will prompt you to enter two artist names and will find the shortest connection between them through collaborations.
+
+### Show Artist Collaborations
+
+```bash
+python cli.py collabs "Artist Name"
+```
+
+Shows all collaborations for the specified artist, grouped by collaborator with song and album details.
+
+### Help
+
+```bash
+python cli.py --help
+```
+
+Shows available commands and their usage.
