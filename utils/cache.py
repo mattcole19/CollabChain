@@ -5,9 +5,9 @@ from typing import Optional, Any, Dict
 
 
 class Cache:
-    def __init__(self, cache_dir: str, ttl_hours: int = 24):
+    def __init__(self, cache_dir: str, ttl_hours: Optional[int] = None):
         self.cache_dir = Path(cache_dir)
-        self.ttl = timedelta(hours=ttl_hours)
+        self.ttl = timedelta(hours=ttl_hours) if ttl_hours else None
         self.cache_dir.mkdir(exist_ok=True, parents=True)
 
     def get(self, key: str) -> Optional[Any]:
@@ -18,12 +18,14 @@ class Cache:
         try:
             with cache_path.open("r") as f:
                 cached_data = json.load(f)
-                cached_time = datetime.fromtimestamp(cached_data["timestamp"])
 
-                if datetime.now() - cached_time > self.ttl:
-                    print(f"Cache expired for {key}")
-                    return None
-                # print(f"Cache hit for {key}")
+                if self.ttl:
+                    cached_time = datetime.fromtimestamp(cached_data["timestamp"])
+
+                    if datetime.now() - cached_time > self.ttl:
+                        print(f"Cache expired for {key}")
+                        return None
+
                 return cached_data["data"]
         except (json.JSONDecodeError, KeyError, OSError):
             return None
