@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+
+# Virtual Environment
+venv/
+
+# Environment Variables
+.env
+
+# Cache
+.cache/
+
+# IDE
+.vscode/
+.cursor/
+
+# OS
+.DS_Store
+Thumbs.db 
