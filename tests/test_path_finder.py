@@ -46,7 +46,7 @@ def test_artist_not_found(mock_spotify):
     # Mock artist not found
     mock_spotify.get_artist_by_name.return_value = None
 
-    path = path_finder.find_path("Nonexistent Artist", "Eminem")
+    path = path_finder.find_path("Nonexistent Artist", "Alpha")
     assert path is None
 
 
@@ -55,7 +55,7 @@ def test_max_depth_limit(mock_spotify):
     path_finder = PathFinder(mock_spotify)
 
     # Set max_depth to 1 to only allow direct collaborations
-    path = path_finder.find_path("MGK", "Eminem", max_depth=1)
+    path = path_finder.find_path("Alpha", "Epsilon", max_depth=1)
     assert path is None  # Should not find the 2-hop path
 
 
