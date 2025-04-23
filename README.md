@@ -40,6 +40,18 @@ uv pip install -r requirements.txt
      - SPOTIFY_CLIENT_ID=your_client_id
      - SPOTIFY_CLIENT_SECRET=your_client_secret
 
+## Using the Streamlit Interface
+
+1. Start the Streamlit app:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+2. Open browser to `http://localhost:8501/`
+
+3. Enter two artists to and click "Find Connection"!
+
 ## CLI Usage
 
 The project provides a command-line interface with the following commands:

@@ -245,6 +245,7 @@ class SpotifyAPI:
         cached = self.cache.get(cache_key)
 
         if cached:
+            print(f"Found cached collaborators for {artist_id}")
             return {
                 Collaboration(
                     artist=Artist.from_spotify_data(collab_data["artist"]),

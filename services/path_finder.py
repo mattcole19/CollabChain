@@ -58,6 +58,10 @@ class PathFinder:
         end_artist = self.spotify.get_artist_by_name(end_artist_name)
         print(f"End artist: {end_artist}")
 
+        if end_artist == start_artist:
+            print("That's the same artist!")
+            return ArtistPath([(start_artist, None)])
+
         if not start_artist or not end_artist:
             print(f"Could not find artist: {start_artist_name} or {end_artist_name}")
             return None
