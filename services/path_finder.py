@@ -54,9 +54,12 @@ class PathFinder:
         """
         # First get both artists
         start_artist = self.spotify.get_artist_by_name(start_artist_name)
+        print(f"Start artist: {start_artist}")
         end_artist = self.spotify.get_artist_by_name(end_artist_name)
+        print(f"End artist: {end_artist}")
 
         if not start_artist or not end_artist:
+            print(f"Could not find artist: {start_artist_name} or {end_artist_name}")
             return None
 
         print(f"Searching for path from {start_artist.name} to {end_artist.name}...")
@@ -68,7 +71,7 @@ class PathFinder:
         # Queue for artists to check (will contain tuples of (artist, is_cached))
         queue = deque([(start_artist, True)])  # Start artist is effectively cached
 
-        while queue and len(visited) <= max_depth * 100:  # Limit total artists checked
+        while queue and len(visited) <= max_depth:  # Limit total artists checked
             current_artist, is_cached = queue.popleft()
             current_path = paths[current_artist.id]
 
