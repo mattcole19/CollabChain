@@ -1,13 +1,14 @@
-from typing import Optional, Set, Iterator, List, Dict, Any
-import requests
-import time
-from datetime import datetime
-from urllib.parse import urlencode
+import asyncio
 import base64
 import os
-from dotenv import load_dotenv
+import time
+from datetime import datetime
+from typing import Any, Dict, Iterator, List, Optional, Set
+from urllib.parse import urlencode
+
 import aiohttp
-import asyncio
+import requests
+from dotenv import load_dotenv
 
 from models.artist import Artist, Collaboration
 from utils.cache import Cache
