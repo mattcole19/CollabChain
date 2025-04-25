@@ -1,4 +1,4 @@
-from typing import Optional, Dict, List, Set, Iterator
+from typing import Optional, Set, Iterator, List, Dict, Any
 import requests
 import time
 from datetime import datetime
@@ -6,9 +6,10 @@ from urllib.parse import urlencode
 import base64
 import os
 from dotenv import load_dotenv
+import aiohttp
+import asyncio
 
 from models.artist import Artist, Collaboration
-from models.track import Track
 from utils.cache import Cache
 
 
@@ -21,12 +22,19 @@ class SpotifyAPI:
             raise ValueError("Missing Spotify credentials in .env file")
 
         self.token = None
+        self._get_token()
         self.cache = Cache(cache_dir=".cache/spotify")
-        # self._setup_rate_limiter()
+        self.session = None
 
-    def _setup_rate_limiter(self, requests_per_second: int = 5):
-        self.last_request: Optional[datetime] = None
-        self.minimum_interval = 1.0 / requests_per_second
+    async def __aenter__(self):
+        """Async context manager entry"""
+        self.session = aiohttp.ClientSession()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit"""
+        if self.session:
+            await self.session.close()
 
     def get_artist_by_name(self, name: str) -> Optional[Artist]:
         """Search for an artist by name and return the best match"""
@@ -45,6 +53,22 @@ class SpotifyAPI:
         artist_data = results["artists"]["items"][0]
         self.cache.set(cache_key, artist_data)
         return Artist.from_spotify_data(artist_data)
+
+    async def get_artist_by_name_async(self, name: str) -> Optional[Artist]:
+        """Async version of get_artist_by_name"""
+        cache_key = f"artist_search_{name}"
+        cached = self.cache.get(cache_key)
+        if cached:
+            return Artist.from_spotify_data(cached)
+
+        data = await self._make_request_async(
+            "search", params={"q": name, "type": "artist", "limit": 1}
+        )
+        if data["artists"]["items"]:
+            artist_data = data["artists"]["items"][0]
+            self.cache.set(cache_key, artist_data)
+            return Artist.from_spotify_data(artist_data)
+        return None
 
     def get_artist_collaborators(self, artist: Artist) -> Set[Collaboration]:
         """
@@ -110,6 +134,120 @@ class SpotifyAPI:
         self.cache.set(cache_key, cache_data)
 
         return collaborations
+
+    async def get_artist_collaborators_async(
+        self, artist: Artist
+    ) -> Set[Collaboration]:
+        """Async version of get_artist_collaborators"""
+        cache_key = f"collaborators_{artist.id}"
+        cached = self.cache.get(cache_key)
+        if cached:
+            return {Collaboration.from_dict(data) for data in cached}
+
+        collaborations = set()
+
+        # Get all albums
+        albums = await self._get_all_artist_albums_async(artist.id)
+
+        # Process albums in smaller batches to avoid rate limiting
+        batch_size = 5  # Process 5 albums at a time
+        for i in range(0, len(albums), batch_size):
+            album_batch = albums[i : i + batch_size]
+            track_tasks = [
+                self._get_album_tracks_async(album["id"]) for album in album_batch
+            ]
+            batch_tracks = await asyncio.gather(*track_tasks)
+
+            # Process tracks from this batch
+            for tracks in batch_tracks:
+                for track in tracks:
+                    for track_artist in track["artists"]:
+                        if track_artist["id"] != artist.id:
+                            try:
+                                data = await self._make_request_async(
+                                    f"artists/{track_artist['id']}"
+                                )
+                                collaboration = Collaboration(
+                                    artist=Artist.from_spotify_data(data),
+                                    track_name=track["name"],
+                                    album_name=track["album"]["name"],
+                                    release_date=datetime.strptime(
+                                        track["album"]["release_date"], "%Y-%m-%d"
+                                    ),
+                                    track_uri=track["uri"],
+                                )
+                                collaborations.add(collaboration)
+                            except Exception as e:
+                                print(f"Error getting collaborator data: {str(e)}")
+
+        # Cache the results
+        self.cache.set(cache_key, [collab.to_dict() for collab in collaborations])
+        return collaborations
+
+    async def _get_all_artist_albums_async(self, artist_id: str) -> List[Dict]:
+        """Get all albums for an artist, handling pagination"""
+        print(f"Getting all albums for {artist_id} asynchronously...")
+        all_albums = []
+        offset = 0
+        limit = 50  # Spotify's maximum limit
+
+        while True:
+            try:
+                data = await self._make_request_async(
+                    f"artists/{artist_id}/albums",
+                    params={
+                        "offset": offset,
+                        "limit": limit,
+                        "include_groups": "album,single",
+                    },
+                )
+
+                albums = data["items"]
+                all_albums.extend(albums)
+
+                if len(albums) < limit:
+                    break
+
+                offset += limit
+            except Exception as e:
+                print(f"Error fetching albums at offset {offset}: {str(e)}")
+                break
+
+        print(f"Found {len(all_albums)} albums for {artist_id}")
+        return all_albums
+
+    async def _get_album_tracks_async(self, album_id: str) -> List[Dict]:
+        """Get all tracks from an album, handling pagination"""
+        all_tracks = []
+        offset = 0
+        limit = 50
+
+        while True:
+            try:
+                data = await self._make_request_async(
+                    f"albums/{album_id}/tracks",
+                    params={"offset": offset, "limit": limit},
+                )
+
+                tracks = data["items"]
+
+                # Get full track details in batches
+                track_ids = [track["id"] for track in tracks]
+                if track_ids:
+                    full_tracks_data = await self._make_request_async(
+                        "tracks", params={"ids": ",".join(track_ids)}
+                    )
+                    all_tracks.extend(full_tracks_data["tracks"])
+
+                if len(tracks) < limit:
+                    break
+
+                offset += limit
+            except Exception as e:
+                print(f"Error fetching tracks at offset {offset}: {str(e)}")
+                break
+
+        return all_tracks
 
     def _get_all_artist_albums(self, artist_id: str) -> Iterator[dict]:
         """Get all albums for an artist, handling pagination"""
@@ -225,6 +363,68 @@ class SpotifyAPI:
         response.raise_for_status()
         return response.json()
 
+    async def _make_request_async(
+        self,
+        endpoint: str,
+        method: str = "GET",
+        params: Optional[Dict] = None,
+        data: Optional[Dict] = None,
+        max_retries: int = 3,
+    ) -> Dict[str, Any]:
+        """
+        Make an async request to the Spotify API with rate limit handling
+        Args:
+            endpoint: API endpoint (without base URL)
+            method: HTTP method
+            params: Query parameters
+            data: Request body for POST/PUT requests
+            max_retries: Maximum number of retry attempts for rate limiting
+        """
+        base_url = "https://api.spotify.com/v1"
+        headers = {"Authorization": f"Bearer {self.token}"}
+
+        url = f"{base_url}/{endpoint}"
+        if params:
+            url = f"{url}?{urlencode(params)}"
+
+        for attempt in range(max_retries + 1):
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.request(
+                        method=method, url=url, headers=headers, json=data
+                    ) as response:
+                        if response.status == 200:
+                            return await response.json()
+                        elif response.status == 429:
+                            # Get retry-after time from headers (in seconds)
+                            retry_after = int(response.headers.get("Retry-After", "2"))
+                            if attempt < max_retries:
+                                print(
+                                    f"Rate limited on {endpoint}. Waiting {retry_after} seconds..."
+                                )
+                                await asyncio.sleep(retry_after)
+                                continue
+                            else:
+                                raise Exception(f"Max retries exceeded for {endpoint}")
+                        elif response.status == 401:
+                            raise Exception("Token expired")
+                        else:
+                            raise Exception(
+                                f"Request failed with status {response.status}"
+                            )
+            except aiohttp.ClientError as e:
+                if attempt < max_retries:
+                    # Add exponential backoff for network errors
+                    wait_time = 2**attempt
+                    print(
+                        f"Request error for {endpoint}. Retrying in {wait_time} seconds..."
+                    )
+                    await asyncio.sleep(wait_time)
+                    continue
+                raise Exception(f"Request failed after {max_retries} retries: {str(e)}")
+
+        raise Exception(f"Request to {endpoint} failed after all retries")
+
     def _get_token(self) -> None:
         """Get Spotify access token using client credentials flow"""
         auth_string = f"{self.client_id}:{self.client_secret}"
@@ -256,4 +456,3 @@ class SpotifyAPI:
                 )
                 for collab_data in cached
             }
-        return None

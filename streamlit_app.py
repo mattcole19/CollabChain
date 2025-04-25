@@ -3,6 +3,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from services.spotify import SpotifyAPI
 from services.path_finder import PathFinder
+import asyncio
 
 
 def init_spotify():
@@ -50,6 +51,15 @@ def create_path_visualization(path):
     return fig
 
 
+async def find_path_async(artist1: str, artist2: str):
+    """Async path finding for Streamlit"""
+    spotify = SpotifyAPI()
+    path_finder = PathFinder(spotify)
+
+    async with spotify:
+        return await path_finder.find_path_async(artist1, artist2)
+
+
 def main():
     st.set_page_config(page_title="Artist Connections", page_icon="🎵", layout="wide")
 
@@ -70,11 +80,10 @@ def main():
 
     if st.button("Find Connection", type="primary"):
         if artist1 and artist2:
-            path_finder = PathFinder(st.session_state.spotify)
-
             with st.spinner(f"Finding connection between {artist1} and {artist2}..."):
                 try:
-                    path = path_finder.find_path(artist1, artist2)
+                    # Use asyncio to run the async function
+                    path = asyncio.run(find_path_async(artist1, artist2))
 
                     if path:
                         st.success("Found a connection! 🎉")

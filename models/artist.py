@@ -49,3 +49,37 @@ class Collaboration:
         if not isinstance(other, Collaboration):
             return NotImplemented
         return self.artist.id == other.artist.id and self.track_uri == other.track_uri
+
+    def to_dict(self) -> dict:
+        """Convert collaboration to dictionary for caching"""
+        return {
+            "artist": {  # Store the raw artist data
+                "id": self.artist.id,
+                "name": self.artist.name,
+                "genres": list(self.artist.genres),
+                "popularity": self.artist.popularity,
+                "uri": self.artist.uri,
+            },
+            "track_name": self.track_name,
+            "album_name": self.album_name,
+            "release_date": self.release_date.isoformat(),
+            "track_uri": self.track_uri,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict) -> "Collaboration":
+        """Create collaboration from cached dictionary"""
+        return cls(
+            artist=Artist(
+                id=data["artist"]["id"],
+                name=data["artist"]["name"],
+                genres=tuple(data["artist"]["genres"]),
+                popularity=data["artist"]["popularity"],
+                uri=data["artist"]["uri"],
+                collaborators=frozenset(),
+            ),
+            track_name=data["track_name"],
+            album_name=data["album_name"],
+            release_date=datetime.fromisoformat(data["release_date"]),
+            track_uri=data["track_uri"],
+        )
