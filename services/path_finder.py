@@ -111,7 +111,7 @@ class PathFinder:
         # is_cached helps prioritize checking cached artists first
         queue: Deque[Tuple[Artist, bool]] = deque([(start_artist, True)])
 
-        while queue and len(visited_artists) <= max_depth * 100:
+        while queue and len(visited_artists) <= max_depth:
             # Take up to 5 artists to process concurrently
             current_batch: List[Tuple[Artist, bool]] = []
             while queue and len(current_batch) < 5:

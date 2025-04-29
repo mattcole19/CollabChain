@@ -149,4 +149,14 @@ def mock_spotify():
     spotify.get_artist_by_name.side_effect = get_artist_by_name
     spotify.get_artist_collaborators.side_effect = get_artist_collaborators
 
+    # Add async versions of the methods
+    async def get_artist_by_name_async(name: str) -> Artist:
+        return get_artist_by_name(name)
+
+    async def get_artist_collaborators_async(artist: Artist) -> set[Collaboration]:
+        return get_artist_collaborators(artist)
+
+    spotify.get_artist_by_name_async.side_effect = get_artist_by_name_async
+    spotify.get_artist_collaborators_async.side_effect = get_artist_collaborators_async
+
     return spotify

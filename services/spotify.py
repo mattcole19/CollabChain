@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from models.artist import Artist, Collaboration
 from utils.cache import Cache
+from utils.util import parse_spotify_date
 
 
 class SpotifyAPI:
@@ -164,22 +165,22 @@ class SpotifyAPI:
                 for track in tracks:
                     for track_artist in track["artists"]:
                         if track_artist["id"] != artist.id:
-                            try:
-                                data = await self._make_request_async(
-                                    f"artists/{track_artist['id']}"
+                            artist_data = await self._get_artist_data_async(
+                                track_artist["id"]
+                            )
+                            if artist_data:
+                                release_date = parse_spotify_date(
+                                    track["album"]["release_date"]
                                 )
+
                                 collaboration = Collaboration(
-                                    artist=Artist.from_spotify_data(data),
+                                    artist=Artist.from_spotify_data(artist_data),
                                     track_name=track["name"],
                                     album_name=track["album"]["name"],
-                                    release_date=datetime.strptime(
-                                        track["album"]["release_date"], "%Y-%m-%d"
-                                    ),
+                                    release_date=release_date,
                                     track_uri=track["uri"],
                                 )
                                 collaborations.add(collaboration)
-                            except Exception as e:
-                                print(f"Error getting collaborator data: {str(e)}")
 
         # Cache the results
         self.cache.set(cache_key, [collab.to_dict() for collab in collaborations])
@@ -330,18 +331,22 @@ class SpotifyAPI:
         except requests.exceptions.RequestException:
             return None
 
+    async def _get_artist_data_async(self, artist_id: str) -> Optional[dict]:
+        """"""
+        cache_key = f"artist_data_{artist_id}"
+        cached = self.cache.get(cache_key)
+        if cached:
+            return cached
+
+        artist_data = await self._make_request_async(f"artists/{artist_id}")
+        self.cache.set(cache_key, artist_data)
+
     def _make_request(
         self, endpoint: str, method: str = "GET", params: Optional[dict] = None
     ) -> dict:
         """Make a request to the Spotify API with rate limiting and caching"""
         if not self.token:
             self._get_token()
-
-        # # Rate limiting
-        # if self.last_request:
-        #     elapsed = (datetime.now() - self.last_request).total_seconds()
-        #     if elapsed < self.minimum_interval:
-        #         time.sleep(self.minimum_interval - elapsed)
 
         base_url = "https://api.spotify.com/v1"
         headers = {"Authorization": f"Bearer {self.token}"}

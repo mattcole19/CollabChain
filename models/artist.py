@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Set, List, Optional
 from datetime import datetime
+from utils.util import parse_spotify_date
 
 
 @dataclass(frozen=True)  # Make the dataclass immutable
@@ -36,10 +37,10 @@ class Artist:
 
 @dataclass(frozen=True)
 class Collaboration:
-    artist: "Artist"
+    artist: Artist
     track_name: str
     album_name: str
-    release_date: datetime
+    release_date: Optional[datetime]
     track_uri: str
 
     def __hash__(self) -> int:
@@ -51,9 +52,8 @@ class Collaboration:
         return self.artist.id == other.artist.id and self.track_uri == other.track_uri
 
     def to_dict(self) -> dict:
-        """Convert collaboration to dictionary for caching"""
         return {
-            "artist": {  # Store the raw artist data
+            "artist": {
                 "id": self.artist.id,
                 "name": self.artist.name,
                 "genres": list(self.artist.genres),
@@ -62,13 +62,14 @@ class Collaboration:
             },
             "track_name": self.track_name,
             "album_name": self.album_name,
-            "release_date": self.release_date.isoformat(),
+            "release_date": self.release_date.isoformat()
+            if self.release_date
+            else None,
             "track_uri": self.track_uri,
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> "Collaboration":
-        """Create collaboration from cached dictionary"""
         return cls(
             artist=Artist(
                 id=data["artist"]["id"],
@@ -80,6 +81,8 @@ class Collaboration:
             ),
             track_name=data["track_name"],
             album_name=data["album_name"],
-            release_date=datetime.fromisoformat(data["release_date"]),
+            release_date=datetime.fromisoformat(data["release_date"])
+            if data["release_date"]
+            else None,
             track_uri=data["track_uri"],
         )
