@@ -1,7 +1,8 @@
 from pathlib import Path
 import json
 from datetime import datetime, timedelta
-from typing import Optional, Any, Dict
+from typing import Optional, Any
+import hashlib
 
 
 class Cache:
@@ -11,7 +12,7 @@ class Cache:
         self.cache_dir.mkdir(exist_ok=True, parents=True)
 
     def get(self, key: str) -> Optional[Any]:
-        cache_path = self.cache_dir / f"{key}.json"
+        cache_path = self.get_cache_path(key)
         if not cache_path.exists():
             return None
 
@@ -31,7 +32,7 @@ class Cache:
             return None
 
     def set(self, key: str, data: Any) -> None:
-        cache_path = self.cache_dir / f"{key}.json"
+        cache_path = self.get_cache_path(key)
         cache_data = {"timestamp": datetime.now().timestamp(), "data": data}
 
         try:
@@ -39,3 +40,9 @@ class Cache:
                 json.dump(cache_data, f)
         except OSError as e:
             print(f"Failed to write cache: {e}")
+
+    def generate_cache_key(self, key: str) -> str:
+        return hashlib.md5(key.encode("utf-8")).hexdigest() + ".json"
+
+    def get_cache_path(self, key: str) -> Path:
+        return self.cache_dir / self.generate_cache_key(key)

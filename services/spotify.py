@@ -40,11 +40,6 @@ class SpotifyAPI:
 
     def get_artist_by_name(self, name: str) -> Optional[Artist]:
         """Search for an artist by name and return the best match"""
-        cache_key = f"artist_search_{name}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return Artist.from_spotify_data(cached)
-
         results = self._make_request(
             "search", params={"q": name, "type": "artist", "limit": 1}
         )
@@ -53,22 +48,15 @@ class SpotifyAPI:
             return None
 
         artist_data = results["artists"]["items"][0]
-        self.cache.set(cache_key, artist_data)
         return Artist.from_spotify_data(artist_data)
 
     async def get_artist_by_name_async(self, name: str) -> Optional[Artist]:
         """Async version of get_artist_by_name"""
-        cache_key = f"artist_search_{name}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return Artist.from_spotify_data(cached)
-
         data = await self._make_request_async(
             "search", params={"q": name, "type": "artist", "limit": 1}
         )
         if data["artists"]["items"]:
             artist_data = data["artists"]["items"][0]
-            self.cache.set(cache_key, artist_data)
             return Artist.from_spotify_data(artist_data)
         return None
 
@@ -144,6 +132,7 @@ class SpotifyAPI:
         cache_key = f"collaborators_{artist.id}"
         cached = self.cache.get(cache_key)
         if cached:
+            print(f"Have collaborators cached for {artist.name}")
             return {Collaboration.from_dict(data) for data in cached}
 
         collaborations = set()
@@ -257,22 +246,15 @@ class SpotifyAPI:
         limit = 50  # Maximum allowed by Spotify
 
         while True:
-            cache_key = f"artist_albums_{artist_id}_{offset}"
-            cached = self.cache.get(cache_key)
-
-            if cached:
-                albums = cached
-            else:
-                response = self._make_request(
-                    f"artists/{artist_id}/albums",
-                    params={
-                        "limit": limit,
-                        "offset": offset,
-                        "include_groups": "album,single",
-                    },
-                )
-                albums = response["items"]
-                self.cache.set(cache_key, albums)
+            response = self._make_request(
+                f"artists/{artist_id}/albums",
+                params={
+                    "limit": limit,
+                    "offset": offset,
+                    "include_groups": "album,single",
+                },
+            )
+            albums = response["items"]
 
             yield from albums
 
@@ -282,11 +264,6 @@ class SpotifyAPI:
 
     def _get_album_tracks(self, album_id: str) -> Iterator[dict]:
         """Get all tracks from an album, handling pagination"""
-        cache_key = f"album_tracks_{album_id}"
-        cached = self.cache.get(cache_key)
-
-        if cached:
-            return cached
 
         tracks = []
         offset = 0
@@ -313,33 +290,21 @@ class SpotifyAPI:
             )
             full_tracks.extend(full_tracks_response["tracks"])
 
-        self.cache.set(cache_key, full_tracks)
         return full_tracks
 
     def _get_artist_data(self, artist_id: str) -> Optional[dict]:
         """Get full artist data"""
-        cache_key = f"artist_data_{artist_id}"
-        cached = self.cache.get(cache_key)
-
-        if cached:
-            return cached
 
         try:
             artist_data = self._make_request(f"artists/{artist_id}")
-            self.cache.set(cache_key, artist_data)
             return artist_data
         except requests.exceptions.RequestException:
             return None
 
     async def _get_artist_data_async(self, artist_id: str) -> Optional[dict]:
         """"""
-        cache_key = f"artist_data_{artist_id}"
-        cached = self.cache.get(cache_key)
-        if cached:
-            return cached
-
         artist_data = await self._make_request_async(f"artists/{artist_id}")
-        self.cache.set(cache_key, artist_data)
+        return artist_data
 
     def _make_request(
         self, endpoint: str, method: str = "GET", params: Optional[dict] = None
@@ -354,20 +319,21 @@ class SpotifyAPI:
         url = f"{base_url}/{endpoint}"
         if params:
             url = f"{url}?{urlencode(params)}"
-        start_time = time.time()
+
+        # Check cache first
+        cached = self.cache.get(url)
+        if cached:
+            return cached
+
         response = requests.request(method, url, headers=headers)
-        end_time = time.time()
-        # print(f"Time taken for '{endpoint}': {end_time - start_time} seconds")
-        # self.last_request = datetime.now()
 
         if response.status_code == 429:
             print(f"Rate limit exceeded: {response.text}")
-            # retry_after = int(response.headers.get("Retry-After", 1))
-            # time.sleep(retry_after)
-            # return self._make_request(endpoint, method, params)
 
         response.raise_for_status()
-        return response.json()
+        response_data = response.json()
+        self.cache.set(url, response_data)
+        return response_data
 
     async def _make_request_async(
         self,
@@ -393,6 +359,11 @@ class SpotifyAPI:
         if params:
             url = f"{url}?{urlencode(params)}"
 
+        # Check cache first
+        cached = self.cache.get(url)
+        if cached:
+            return cached
+
         for attempt in range(max_retries + 1):
             try:
                 async with aiohttp.ClientSession() as session:
@@ -400,7 +371,9 @@ class SpotifyAPI:
                         method=method, url=url, headers=headers, json=data
                     ) as response:
                         if response.status == 200:
-                            return await response.json()
+                            response_data = await response.json()
+                            self.cache.set(url, response_data)
+                            return response_data
                         elif response.status == 429:
                             # Get retry-after time from headers (in seconds)
                             retry_after = int(response.headers.get("Retry-After", "2"))

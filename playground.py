@@ -123,11 +123,11 @@ def sync_vs_async_test_path_finding():
     # print(path)
 
     # Async version
-    artist1 = "MGK"
-    artist2 = "Eminem"
-    path_finder = PathFinder(spotify)
-    path = asyncio.run(path_finder.find_path_async(artist1, artist2))
-    print(path)
+    # artist1 = "MGK"
+    # artist2 = "Eminem"
+    # path_finder = PathFinder(spotify)
+    # path = asyncio.run(path_finder.find_path_async(artist1, artist2))
+    # print(path)
 
 
 if __name__ == "__main__":

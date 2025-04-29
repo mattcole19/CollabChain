@@ -1,22 +1,19 @@
 from dataclasses import dataclass, field
-from typing import Set, List, Optional
+from typing import Optional
 from datetime import datetime
-from utils.util import parse_spotify_date
 
 
-@dataclass(frozen=True)  # Make the dataclass immutable
+@dataclass(frozen=True)
 class Artist:
     id: str
     name: str
-    genres: tuple[str, ...]  # Change from List to tuple since lists aren't hashable
+    genres: tuple[str, ...]
     popularity: int
     uri: str
-    collaborators: frozenset[str] = field(
-        default_factory=frozenset
-    )  # Change from Set to frozenset
+    collaborators: frozenset[str] = field(default_factory=frozenset)
 
     def __hash__(self) -> int:
-        return hash(self.id)  # Use the Spotify ID as the hash
+        return hash(self.id)
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Artist):
@@ -28,10 +25,10 @@ class Artist:
         return cls(
             id=data["id"],
             name=data["name"],
-            genres=tuple(data["genres"]),  # Convert list to tuple
+            genres=tuple(data["genres"]),
             popularity=data["popularity"],
             uri=data["uri"],
-            collaborators=frozenset(),  # Empty frozenset instead of set
+            collaborators=frozenset(),
         )
 
 
