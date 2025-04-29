@@ -82,7 +82,7 @@ class PathFinder:
         Args:
             start_artist_name: Name of the starting artist
             end_artist_name: Name of the target artist
-            max_depth: Maximum number of connections to traverse
+            max_depth: Maximum number of hops between artists (e.g. max_depth=3 means up to 3 artists can be between start and end)
 
         Returns:
             Optional[ArtistPath]: The path between artists if found, None otherwise
@@ -107,13 +107,12 @@ class PathFinder:
             start_artist.id: [PathNode(artist=start_artist)]
         }
 
-        # Queue of (artist, is_cached) pairs to process
-        # is_cached helps prioritize checking cached artists first
-        queue: Deque[Tuple[Artist, bool]] = deque([(start_artist, True)])
+        # Queue will store (artist, is_cached, depth) tuples
+        queue: Deque[Tuple[Artist, bool, int]] = deque([(start_artist, True, 0)])
 
-        while queue and len(visited_artists) <= max_depth:
+        while queue:
             # Take up to 5 artists to process concurrently
-            current_batch: List[Tuple[Artist, bool]] = []
+            current_batch: List[Tuple[Artist, bool, int]] = []
             while queue and len(current_batch) < 5:
                 current_batch.append(queue.popleft())
 
@@ -125,7 +124,7 @@ class PathFinder:
             # Get collaborators for all artists in current batch concurrently
             collab_tasks = [
                 self.spotify.get_artist_collaborators_async(artist)
-                for artist, _ in current_batch
+                for artist, _, _ in current_batch
             ]
 
             try:
@@ -135,12 +134,19 @@ class PathFinder:
                 continue
 
             # Process each artist's collaborations
-            for (current_artist, _), collaborations in zip(
+            for (current_artist, _, current_depth), collaborations in zip(
                 current_batch, collaborations_list
             ):
+                # Skip if we've exceeded max depth
+                if current_depth >= max_depth:
+                    print(
+                        f"Skipping {current_artist.name} because depth limit reached ({current_depth} >= {max_depth})"
+                    )
+                    continue
+
                 current_path = artist_paths[current_artist.id]
                 print(
-                    f"Checking {len(collaborations)} collaborators for {current_artist.name}"
+                    f"Checking {len(collaborations)} collaborators for {current_artist.name} at depth {current_depth}"
                 )
 
                 # Process each collaboration
@@ -157,17 +163,20 @@ class PathFinder:
 
                         # Check if we found the target artist
                         if collaborator.id == end_artist.id:
-                            print(f"Found path through {current_artist.name}!")
+                            print(
+                                f"Found path through {current_artist.name} at depth {current_depth + 1}!"
+                            )
                             return ArtistPath(new_path)
 
                         # Add to visited and queue for processing
                         visited_artists.add(collaborator.id)
                         artist_paths[collaborator.id] = new_path
-                        queue.append((collaborator, True))
+                        # Add to queue with incremented depth
+                        queue.append((collaborator, True, current_depth + 1))
 
-            print(f"Checked {len(visited_artists)} artists so far...")
+                print(f"Checked {len(visited_artists)} artists so far...")
 
-        print("No path found within depth limit")
+        print(f"No path found within depth limit of {max_depth}")
         return None
 
     def find_path(
