@@ -1,8 +1,7 @@
-from typing import List, Optional, Dict, Set, Tuple, Deque
+import asyncio
 from collections import deque
 from dataclasses import dataclass
-import asyncio
-import aiohttp
+from typing import Deque, Dict, List, Optional, Set, Tuple
 
 from models.artist import Artist, Collaboration
 from services.spotify import SpotifyAPI
