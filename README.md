@@ -14,22 +14,21 @@ A Python tool to discover connections between music artists through their collab
 1. Clone the repository
 
 ```bash
-git clone https://github.com/mattcole19/artist-connections.git
+git clone git@github.com:mattcole19/CollabChain.git
 cd artist-connections
 ```
 
-2. Create and activate a virtual environment
+2. Create and activate a virtual environment using uv
 
 ```bash
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-3. Install dependencies
+3. Install dependencies using uv
 
 ```bash
-pip install uv
-uv pip install -r requirements.txt
+uv add -r requirements.txt
 ```
 
 4. Set up Spotify API credentials
@@ -45,7 +44,7 @@ uv pip install -r requirements.txt
 1. Start the Streamlit app:
 
 ```bash
-streamlit run streamlit_app.py
+uv run streamlit run streamlit_app.py
 ```
 
 2. Open browser to `http://localhost:8501/`
@@ -59,7 +58,7 @@ The project provides a command-line interface with the following commands:
 ### Find Path Between Artists
 
 ```bash
-python cli.py path
+uv run python cli.py path
 ```
 
 This will prompt you to enter two artist names and will find the shortest connection between them through collaborations.
@@ -67,7 +66,7 @@ This will prompt you to enter two artist names and will find the shortest connec
 ### Show Artist Collaborations
 
 ```bash
-python cli.py collabs "Artist Name"
+uv run python cli.py collabs "Artist Name"
 ```
 
 Shows all collaborations for the specified artist, grouped by collaborator with song and album details.
@@ -75,7 +74,7 @@ Shows all collaborations for the specified artist, grouped by collaborator with 
 ### Help
 
 ```bash
-python cli.py --help
+uv run python cli.py --help
 ```
 
 Shows available commands and their usage.
