@@ -21,11 +21,13 @@ Expected Paths:
 - Alpha -> Epsilon: through Gamma, Beta, and Delta via "Song Two" -> "Song Four" -> "Song Five"
 """
 
-import pytest
-from unittest.mock import Mock
-from services.spotify import SpotifyAPI
-from models.artist import Artist, Collaboration
 from datetime import datetime
+from unittest.mock import Mock
+
+import pytest
+
+from models.artist import Artist, Collaboration
+from services.spotify import SpotifyAPI
 
 
 @pytest.fixture

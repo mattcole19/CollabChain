@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from typing import Set, Optional
 from datetime import datetime
+from typing import Set
 
 
 @dataclass
